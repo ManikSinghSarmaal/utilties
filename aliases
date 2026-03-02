@@ -6,7 +6,7 @@ alias hdmi_off='sudo pmset -b disablesleep 0'
 alias hdmi_on='sudo pmset -b disablesleep 1'
 alias sortsize='du -sh * | sort -hr | head -10'
 alias dc='docker-compose'
-
+alias cwd='realpath'
 # minio client
 alias mc='http://localhost:9000 minioadmin minioadmin123'
 alias push='git push origin main'
