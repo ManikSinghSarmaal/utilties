@@ -1,0 +1,17 @@
+alias c='clear'
+alias envs='conda env list'
+alias vlc='/Applications/VLC.app/Contents/MacOS/VLC'
+alias cursor='/Applications/Cursor.app/Contents/MacOS/Cursor'
+alias hdmi_off='sudo pmset -b disablesleep 0'
+alias hdmi_on='sudo pmset -b disablesleep 1'
+alias sortsize='du -sh * | sort -hr | head -10'
+alias dc='docker-compose'
+
+# minio client
+alias mc='http://localhost:9000 minioadmin minioadmin123'
+alias push='git push origin main'
+
+#docker utilities
+alias containers='docker ps -a --format {{.Names}} | grep -v k8s'
+
+alias container_info='for x in $(containers); do echo "Container Name:" $x && docker inspect $x --format {{.Mounts}}; done'
