@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaMTX WebRTC Call</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #121212; color: white; padding: 20px; }
+        .container { max-width: 800px; margin: auto; }
+        .controls { background: #1e1e1e; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .controls input { padding: 10px; border-radius: 4px; border: 1px solid #333; background: #2a2a2a; color: white; }
+        .controls button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .controls button:hover { background: #0056b3; }
+        .video-grid { display: flex; gap: 20px; }
+        .video-box { flex: 1; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
+        .video-box p { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 5px 10px; margin: 0; border-radius: 4px; z-index: 10; }
+        video { width: 100%; height: auto; display: block; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Local Network Video Call</h2>
+    
+    <div class="controls">
+        <input type="text" id="serverIp" value="192.168.1.10" placeholder="MediaMTX IP">
+        <input type="text" id="myStreamName" value="user1" placeholder="My Stream Name">
+        <input type="text" id="remoteStreamName" value="user2" placeholder="Remote Stream Name">
+        <button onclick="startCall()">Start Call</button>
+    </div>
+
+    <div class="video-grid">
+        <div class="video-box">
+            <p>You (Local)</p>
+            <video id="localVideo" autoplay playsinline muted></video>
+        </div>
+        <div class="video-box">
+            <p>Them (Remote)</p>
+            <video id="remoteVideo" autoplay playsinline></video>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Helper function to gather ICE candidates before sending the SDP to MediaMTX
+    async function getOfferWithIce(pc) {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        
+        // Wait for ICE gathering to complete so all network paths are included
+        return new Promise((resolve) => {
+            if (pc.iceGatheringState === 'complete') {
+                resolve(pc.localDescription);
+            } else {
+                pc.onicegatheringstatechange = () => {
+                    if (pc.iceGatheringState === 'complete') resolve(pc.localDescription);
+                };
+                // Safety timeout
+                setTimeout(() => resolve(pc.localDescription), 2000);
+            }
+        });
+    }
+
+    // 1. Publish your camera to MediaMTX (WHIP)
+    async function publishStream(stream, serverIp, streamName) {
+        const pc = new RTCPeerConnection();
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+        const offer = await getOfferWithIce(pc);
+        
+        const response = await fetch(`http://${serverIp}:8889/${streamName}/whip`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/sdp' },
+            body: offer.sdp
+        });
+
+        const answerSdp = await response.text();
+        await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+        console.log(`Publishing to ${streamName} successful`);
+    }
+
+    // 2. Read the other person's camera from MediaMTX (WHEP)
+    async function readStream(serverIp, streamName, videoElement) {
+        const pc = new RTCPeerConnection();
+        pc.addTransceiver('video', { direction: 'recvonly' });
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+
+        // When the remote track arrives, attach it to the video element
+        pc.ontrack = (event) => {
+            if (videoElement.srcObject !== event.streams[0]) {
+                videoElement.srcObject = event.streams[0];
+                console.log(`Receiving ${streamName} stream`);
+            }
+        };
+
+        const offer = await getOfferWithIce(pc);
+
+        const response = await fetch(`http://${serverIp}:8889/${streamName}/whep`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/sdp' },
+            body: offer.sdp
+        });
+
+        const answerSdp = await response.text();
+        await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+    }
+
+    // Main Function: Triggered when you click "Start Call"
+    async function startCall() {
+        const serverIp = document.getElementById('serverIp').value;
+        const myStreamName = document.getElementById('myStreamName').value;
+        const remoteStreamName = document.getElementById('remoteStreamName').value;
+
+        try {
+            // Grab webcam and mic
+            const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            document.getElementById('localVideo').srcObject = localStream;
+
+            // Start publishing your video (WHIP)
+            publishStream(localStream, serverIp, myStreamName);
+
+            // Continuously try to read the remote video (WHEP)
+            // We use a small delay/retry because the other person might not be connected yet
+            const tryRead = async () => {
+                try {
+                    await readStream(serverIp, remoteStreamName, document.getElementById('remoteVideo'));
+                } catch (e) {
+                    console.log("Remote stream not ready yet, retrying in 2 seconds...");
+                    setTimeout(tryRead, 2000);
+                }
+            };
+            tryRead();
+
+        } catch (error) {
+            alert("Error accessing webcam or connecting: " + error.message);
+            console.error(error);
+        }
+    }
+</script>
+
+</body>
+</html>
