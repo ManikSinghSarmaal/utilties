@@ -1,0 +1,36 @@
+
+
+
+# Install git-filter-repo
+python3 -m pip install --user git-filter-repo
+
+
+# Backup — make a mirror backup
+git clone --mirror <git_url> repo-backup.git
+# keep repo-backup.git somewhere safe (external disk / different machine)
+
+
+# Make a working mirror to operate on
+git clone --mirror <git_url> repo-clean.git
+cd repo-clean.git    # this is a *bare* repository (no working tree)
+
+# Run git-filter-repo to remove the folder from all commits, if the folder is at repository root and named exactly google_workspace_cli
+git filter-repo --path google_workspace_cli --invert-paths
+
+
+# Note: git filter repo usually removes the origin to prevent unwanted pushed, add remote back
+git remote add origin <repo.git>
+
+# Expire reflogs and aggressively GC (prune unreachable old objects)
+git reflog expire --expire=now --all
+git gc --prune=now --aggressive
+
+
+# Measure new size and compare
+du -sh ../repo-backup.git
+du -sh .
+git count-objects -vH
+
+
+# If everything looks correct — force-push the cleaned mirror to origin
+git push --force --mirror origin
