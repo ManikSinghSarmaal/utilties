@@ -364,3 +364,23 @@ commit() {
 
   git commit -m "$*"
 }
+
+
+#---------------------------------------------------------------------------------------------------------------------------
+# list commits in local mirror that differ from remote
+#---------------------------------------------------------------------------------------------------------------------------
+list_mirror_commits() {
+  git for-each-ref --format="%(refname:short)" refs/heads |
+  while read -r ref; do
+    echo "Ref: $ref"
+
+    if git show-ref --verify --quiet "refs/remotes/origin/$ref"; then
+      git log --oneline --graph --decorate origin/$ref..$ref
+    else
+      echo "  (no corresponding origin branch)"
+      git log --oneline --graph --decorate "$ref"
+    fi
+
+    echo
+  done
+}

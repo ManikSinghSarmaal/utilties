@@ -15,3 +15,9 @@ alias push='git push origin main'
 alias containers='docker ps -a --format {{.Names}} | grep -v k8s'
 
 alias container_info='for x in $(containers); do echo "Container Name:" $x && docker inspect $x --format {{.Mounts}}; done'
+
+alias large_git_blobs="git rev-list --objects --all \
+  | git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' \
+  | sed -n 's/^blob //p' \
+  | sort -n -k2 \
+  | tail -n 20"
