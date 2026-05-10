@@ -384,3 +384,17 @@ list_mirror_commits() {
     echo
   done
 }
+
+
+# fuzzy search custom bash function, then search through the implementation line-by-line
+ffunc() {
+  local fn
+  fn=$(print -rl -- ${(k)functions} | fzf --prompt='function> ') || return
+
+  whence -f "$fn" |
+    fzf \
+      --no-sort \
+      --prompt="$fn body> " \
+      --preview='echo {}' \
+      --preview-window=down:3:wrap
+}
